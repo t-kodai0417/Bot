@@ -2,21 +2,45 @@
 import disnake, asyncio ,os
 from disnake.ext import commands
 import sqlite3,random
+import traceback
 
-TOKEN = ""
+TOKEN = "MTA3NDM1MTU3MzQyMzExNjM2OA.GCHenl._YoWlyVuW1jOJjT1fHD8wv_r71Yx9ppYxR0HjQ"
 
 intents = disnake.Intents.default()
+intents.members = True
+intents.message_content = True
 
-sync_cmd = commands.CommandSyncFlags(sync_commands_debug=True)
+sync_cmd = commands.CommandSyncFlags(sync_commands_debug=True)#コマンドの登録状況を確認
 bot = commands.Bot(command_prefix="!?", intents=intents,command_sync_flags=sync_cmd)
 
-@bot.slash_command()
-async def reset(inter):
+@bot.slash_command(name="logout",description="アカウントとの連携を解除します。")
+async def logout(inter):
     conn = sqlite3.connect("./user.db")
     cur = conn.cursor()
     cur.execute("DELETE FROM logined WHERE userid='{}'".format(str(inter.author.id)))
     conn.commit()
     await inter.response.send_message("success",ephemeral=True)
+
+@bot.slash_command(name="userinfo",description="連携しているアカウントの情報を表示します。")
+async def userinfo(inter):
+    conn = sqlite3.connect("./user.db")
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM logined WHERE userid='{}'".format(str(inter.author.id)))
+    get_data = cur.fetchall()
+    if get_data == []:
+        embed = disnake.Embed(title="エラー",description=f"先にログインを完了させてください。",color=0xff0000)
+        await inter.response.send_message(embed=embed,ephemeral=True)
+        return
+    else:
+        try:
+            username = get_data[0][0]
+            cur.execute("SELECT * FROM userinfo WHERE username='{}'".format(username))
+            description = cur.fetchall()[0][1]
+            embed = disnake.Embed(title=f"`{username}`の情報",description=description,color=0x7fffd4)
+            await inter.response.send_message(embed=embed,ephemeral=True)
+        except:
+            embed = disnake.Embed(title="エラーが発生しました。",description=f"```{traceback.format_exc()}```",color=0xff0000)
+            await inter.response.send_message(embed=embed,ephemeral=True)
 
 
 @bot.slash_command(title="login",description="ログインします")
@@ -76,9 +100,12 @@ if __name__ == "__main__":
     cur = conn.cursor()
     cur.execute("CREATE TABLE IF NOT EXISTS users(username text unique,password text)")
     cur.execute("CREATE TABLE IF NOT EXISTS logined(username text,userid text unique)")
+    cur.execute("CREATE TABLE IF NOT EXISTS userinfo(username text unique,description text)")
     try:
         cur.execute("INSERT INTO users VALUES('outaokura','lickmyjohnson')")
         cur.execute("INSERT INTO users VALUES('nyaa','ohnobigpenis')")
+        cur.execute("INSERT INTO userinfo VALUES('outaokura','GayDonutOwner')")
+        cur.execute("INSERT INTO userinfo VALUES('nyaa','TwitterID:ohnobigpenis')")
     except:
         None
     conn.commit()
